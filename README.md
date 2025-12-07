@@ -1,39 +1,43 @@
 # Sales Management System
 
 ## Overview
-A robust Sales Management System designed to visualize and manage sales transactions efficiently. It features a responsive dashboard with key performance indicators, detailed transaction logs, and a sidebar navigation system. The application seamlessly integrates with Google Drive to fetch and process sales data in real-time.
+The Sales Management System is a full-stack web application designed to manage and visualize sales data. It provides a dashboard for viewing transaction details, filtering data by various criteria (region, gender, category, etc.), and analyzing sales performance through aggregated statistics. The system handles large datasets efficiently using a SQLite database.
 
 ## Tech Stack
 - **Frontend**: React, Vite, CSS (Vanilla)
-- **Backend**: Node.js, Express
-- **Data**: Google Drive API, CSV Parsing (csv-parse)
-- **Tools**: Axios, Lucide React (Icons)
+- **Backend**: Node.js, Express.js
+- **Database**: SQLite, Sequelize ORM
+- **Language**: JavaScript (ES Modules)
 
 ## Search Implementation Summary
-Search functionality is handled server-side in `salesService.js`. The system filters the dataset by checking if the search term is included in either the `Customer Name` (case-insensitive) or `Phone No`. The frontend `SearchBar` component captures user input and triggers a data fetch with the `search` query parameter.
+Search functionality is implemented in the backend `SalesService`. It uses Sequelize's `Op.like` operator to perform case-insensitive partial matches on `customer_name` and `phone_number` fields. The search term is applied as an `OR` condition across these fields.
 
 ## Filter Implementation Summary
-Filtering is implemented as a cumulative process in the backend. The `salesService` accepts a filter object (e.g., `{ "Customer Region": "East", "Gender": "Male" }`) and iterates through the data, keeping only records that match all active criteria. The frontend `FilterBar` dynamically generates dropdowns based on available data options.
+Filtering is handled dynamically in the backend. The `SalesService` constructs a `where` clause based on provided query parameters. Supported filters include:
+- `region`, `gender`, `category`, `paymentMethod` (Exact match/IN clause)
+- `minAge`, `maxAge` (Range comparison)
+- `startDate`, `endDate` (Date range comparison)
+- `tags` (Partial match using `Op.like`)
 
 ## Sorting Implementation Summary
-Sorting logic resides in the backend's `salesService`. It supports sorting by `Date`, `Total Amount`, `Quantity`, and `Customer Name`. The system parses dates and numeric values to ensure correct ordering (ascending or descending) before returning the sorted slice of data to the frontend.
+Sorting is achieved via the `order` parameter in Sequelize queries. The API accepts a `sortBy` parameter (e.g., `date`, `quantity`, `customer_name`) and applies the corresponding column and direction (`ASC` or `DESC`) to the database query. Default sorting is by `date` in descending order.
 
 ## Pagination Implementation Summary
-Server-side pagination is used to optimize performance. The backend accepts `page` and `limit` parameters to calculate the starting index and slice the data array accordingly. It returns the data subset along with `totalPages`, `currentPage`, and `totalRecords` metadata, which the frontend `Pagination` component uses to render numbered navigation controls.
+Server-side pagination is implemented using `limit` and `offset` in Sequelize. The frontend sends `page` and `limit` parameters. The backend calculates `offset = (page - 1) * limit` and returns the requested slice of data along with total count and total pages metadata.
 
 ## Setup Instructions
-1. **Backend Setup**:
-   ```bash
-   cd backend
-   npm install
-   npm start
-   ```
-   Runs on `http://localhost:5001`.
+1.  **Backend Setup**:
+    ```bash
+    cd backend
+    npm install
+    npm start
+    ```
+    The server will start on port 5001 and automatically import data into `database.sqlite` if empty.
 
-2. **Frontend Setup**:
-   ```bash
-   cd frontend
-   npm install
-   npm run dev
-   ```
-   Accessible at the local Vite URL (usually `http://localhost:5173`).
+2.  **Frontend Setup**:
+    ```bash
+    cd frontend
+    npm install
+    npm run dev
+    ```
+    The application will be available at `http://localhost:5173`.

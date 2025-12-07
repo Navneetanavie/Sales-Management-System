@@ -1,6 +1,6 @@
-const salesService = require('../services/salesService');
+import salesService from '../services/salesService.js';
 
-exports.getSales = async (req, res) => {
+export const getSales = async (req, res) => {
   try {
     await salesService.ensureLoaded();
     const result = await salesService.getSales(req.query);
@@ -10,7 +10,7 @@ exports.getSales = async (req, res) => {
   }
 };
 
-exports.getFilterOptions = async (req, res) => {
+export const getFilterOptions = async (req, res) => {
   try {
     await salesService.ensureLoaded();
     const regions = await salesService.getUniqueValues('customer_region');

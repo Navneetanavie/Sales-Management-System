@@ -1,9 +1,13 @@
-const fs = require('fs');
-const path = require('path');
-const csv = require('csv-parser');
-const { Op } = require('sequelize');
-const sequelize = require('../config/database');
-const Sale = require('../models/Sale');
+import fs from 'fs';
+import path from 'path';
+import csv from 'csv-parser';
+import { Op } from 'sequelize';
+import { fileURLToPath } from 'url';
+import sequelize from '../config/database.js';
+import Sale from '../models/Sale.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 class SalesService {
   constructor() {
@@ -35,6 +39,69 @@ class SalesService {
     } catch (error) {
       console.error('Database initialization error:', error);
     }
+  }
+
+  importData() {
+    const DATA_PATH = path.join(__dirname, '../data/sales_data.csv');
+
+    if (!fs.existsSync(DATA_PATH)) {
+      console.warn('Sales data file not found. Skipping import.');
+      this.resolveLoaded();
+      return;
+    }
+
+    const results = [];
+    const BATCH_SIZE = 1000;
+
+    fs.createReadStream(DATA_PATH)
+      .pipe(csv({
+        mapHeaders: ({ header }) => header.toLowerCase().replace(/ /g, '_')
+      }))
+      .on('data', (data) => {
+        const processed = {
+          transaction_id: data.transaction_id,
+          customer_id: data.customer_id,
+          product_id: data.product_id,
+          employee_name: data.employee_name,
+          customer_name: data.customer_name,
+          phone_number: data.phone_number,
+          customer_region: data.customer_region,
+          gender: data.gender,
+          product_category: data.product_category,
+          payment_method: data.payment_method,
+          date: data.date,
+          age: parseInt(data.age) || 0,
+          quantity: parseInt(data.quantity) || 0,
+          price_per_unit: parseFloat(data.price_per_unit) || 0,
+          discount_percentage: parseFloat(data.discount_percentage) || 0,
+          total_amount: parseFloat(data.total_amount) || 0,
+          final_amount: parseFloat(data.final_amount) || 0,
+          tags: data.tags || ''
+        };
+        results.push(processed);
+      })
+      .on('end', async () => {
+        try {
+          console.log(`Parsed ${results.length} records. Inserting into database...`);
+
+          // Insert in batches
+          for (let i = 0; i < results.length; i += BATCH_SIZE) {
+            const batch = results.slice(i, i + BATCH_SIZE);
+            await Sale.bulkCreate(batch, { ignoreDuplicates: true });
+            if (i % 10000 === 0) console.log(`Inserted ${i} records...`);
+          }
+
+          console.log('Data imported successfully.');
+          this.resolveLoaded();
+        } catch (error) {
+          console.error('Error importing data:', error);
+          this.resolveLoaded(); // Resolve anyway to allow app to start
+        }
+      })
+      .on('error', (err) => {
+        console.error('Error reading CSV:', err);
+        this.resolveLoaded(); // Resolve anyway to allow app to start
+      });
   }
 
   async getSales(params) {
@@ -95,9 +162,7 @@ class SalesService {
       offset
     });
 
-    // Calculate stats (simplified for performance, or do separate aggregate query)
-    // For large datasets, calculating stats on filtered result might be expensive.
-    // We'll do a separate aggregate query for stats on the filtered set.
+
     const stats = await Sale.findAll({
       attributes: [
         [sequelize.fn('SUM', sequelize.col('quantity')), 'totalUnits'],
@@ -110,8 +175,7 @@ class SalesService {
       raw: true
     });
 
-    // Calculate total discount manually or via another query if critical
-    // For now, let's use the basic stats
+
     const statResult = stats[0] || {};
 
     return {
@@ -140,11 +204,7 @@ class SalesService {
   }
 
   async getAllTags() {
-    // This is expensive in SQL if tags are comma-separated strings.
-    // Ideally tags should be normalized. For now, we'll fetch all tags and process in memory 
-    // (or use a distinct query if possible, but split is hard).
-    // Given the constraint, let's just return empty or a predefined list to avoid performance kill.
-    // Or, we can fetch distinct tags column and split.
+
     const results = await Sale.findAll({
       attributes: [[sequelize.fn('DISTINCT', sequelize.col('tags')), 'tags']],
       raw: true
@@ -160,4 +220,4 @@ class SalesService {
   }
 }
 
-module.exports = new SalesService();
+export default new SalesService();
