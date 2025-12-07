@@ -25,13 +25,24 @@ class SalesService {
         }))
         .on('data', (data) => {
           const processed = {
-            ...data,
+            // Explicitly select only needed fields to save memory
+            customer_name: data.customer_name,
+            phone_number: data.phone_number,
+            customer_region: data.customer_region,
+            gender: data.gender,
+            product_category: data.product_category,
+            payment_method: data.payment_method,
+            date: data.date,
+
+            // Numeric fields
             age: parseInt(data.age) || 0,
             quantity: parseInt(data.quantity) || 0,
             price_per_unit: parseFloat(data.price_per_unit) || 0,
             discount_percentage: parseFloat(data.discount_percentage) || 0,
             total_amount: parseFloat(data.total_amount) || 0,
             final_amount: parseFloat(data.final_amount) || 0,
+
+            // Array fields
             tags: data.tags ? data.tags.split(',').map(t => t.trim()) : []
           };
           results.push(processed);
