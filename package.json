@@ -6,6 +6,7 @@
     "frontend"
   ],
   "scripts": {
-    "start": "echo 'Run scripts from backend or frontend workspaces'"
+    "start": "cd backend && npm start",
+    "build": "cd backend && npm install"
   }
 }
