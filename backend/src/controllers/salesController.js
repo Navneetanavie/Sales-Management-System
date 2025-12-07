@@ -1,7 +1,8 @@
 const salesService = require('../services/salesService');
 
-exports.getSales = (req, res) => {
+exports.getSales = async (req, res) => {
   try {
+    await salesService.ensureLoaded();
     const result = salesService.getSales(req.query);
     res.json(result);
   } catch (error) {
@@ -9,8 +10,9 @@ exports.getSales = (req, res) => {
   }
 };
 
-exports.getFilterOptions = (req, res) => {
+exports.getFilterOptions = async (req, res) => {
   try {
+    await salesService.ensureLoaded();
     const regions = salesService.getUniqueValues('customer_region');
     const genders = salesService.getUniqueValues('gender');
     const categories = salesService.getUniqueValues('product_category');

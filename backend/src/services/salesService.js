@@ -5,7 +5,14 @@ const csv = require('csv-parser');
 class SalesService {
   constructor() {
     this.data = [];
+    this.dataLoaded = new Promise((resolve) => {
+      this.resolveLoaded = resolve;
+    });
     this.loadData();
+  }
+
+  async ensureLoaded() {
+    await this.dataLoaded;
   }
 
   loadData() {
@@ -50,10 +57,12 @@ class SalesService {
         .on('end', () => {
           this.data = results;
           console.log(`Successfully loaded ${this.data.length} records from Google Drive.`);
+          this.resolveLoaded();
         })
         .on('error', (err) => {
           console.error('Error parsing CSV stream:', err);
           this.data = [];
+          this.resolveLoaded();
         });
     };
 
