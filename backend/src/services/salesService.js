@@ -101,6 +101,7 @@ class SalesService {
         console.error('Error loading data from Drive:', err.message);
         console.log('Falling back to mock data.');
         this.data = [];
+        this.resolveLoaded();
       });
   }
 
