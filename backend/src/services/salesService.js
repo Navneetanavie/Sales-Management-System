@@ -1,4 +1,3 @@
-const mockData = require('../data/mockData');
 const fs = require('fs');
 const path = require('path');
 const csv = require('csv-parser');
@@ -43,7 +42,7 @@ class SalesService {
         })
         .on('error', (err) => {
           console.error('Error parsing CSV stream:', err);
-          this.data = mockData;
+          this.data = [];
         });
     };
 
@@ -81,7 +80,7 @@ class SalesService {
       .catch(err => {
         console.error('Error loading data from Drive:', err.message);
         console.log('Falling back to mock data.');
-        this.data = mockData;
+        this.data = [];
       });
   }
 
