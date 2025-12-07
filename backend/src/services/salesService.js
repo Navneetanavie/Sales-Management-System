@@ -96,7 +96,7 @@ class SalesService {
   }
 
   getSales(params) {
-    let results = [...this.data];
+    let results = this.data;
 
 
     if (params.search) {
@@ -151,6 +151,10 @@ class SalesService {
     }
 
 
+    // Critical: Only copy if we haven't filtered (to avoid mutating this.data)
+    if (results === this.data) {
+      results = [...results];
+    }
 
     if (params.sortBy) {
       results.sort((a, b) => {
