@@ -42,8 +42,8 @@ class SalesService {
             total_amount: parseFloat(data.total_amount) || 0,
             final_amount: parseFloat(data.final_amount) || 0,
 
-            // Array fields
-            tags: data.tags ? data.tags.split(',').map(t => t.trim()) : []
+            // Array fields - Store as string to save memory
+            tags: data.tags || ''
           };
           results.push(processed);
         })
@@ -144,7 +144,10 @@ class SalesService {
 
     if (params.tags) {
       const tags = Array.isArray(params.tags) ? params.tags : [params.tags];
-      results = results.filter(item => item.tags.some(tag => tags.includes(tag)));
+      results = results.filter(item => {
+        if (!item.tags) return false;
+        return tags.some(tag => item.tags.includes(tag));
+      });
     }
 
 
@@ -205,8 +208,8 @@ class SalesService {
   getAllTags() {
     const tags = new Set();
     this.data.forEach(item => {
-      if (Array.isArray(item.tags)) {
-        item.tags.forEach(tag => tags.add(tag));
+      if (item.tags) {
+        item.tags.split(',').forEach(tag => tags.add(tag.trim()));
       }
     });
     return Array.from(tags);
