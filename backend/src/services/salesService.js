@@ -1,227 +1,157 @@
 const fs = require('fs');
 const path = require('path');
 const csv = require('csv-parser');
+const { Op } = require('sequelize');
+const sequelize = require('../config/database');
+const Sale = require('../models/Sale');
 
 class SalesService {
   constructor() {
-    this.data = [];
     this.dataLoaded = new Promise((resolve) => {
       this.resolveLoaded = resolve;
     });
-    this.loadData();
+    this.initDatabase();
   }
 
   async ensureLoaded() {
     await this.dataLoaded;
   }
 
-  loadData() {
-    const FILE_ID = '1tzbyuxBmrBwMSXbL22r33FUMtO0V_lxb';
-    const DRIVE_URL = `https://drive.google.com/uc?export=download&id=${FILE_ID}`;
+  async initDatabase() {
+    try {
+      await sequelize.authenticate();
+      console.log('Connected to SQLite database.');
 
-    console.log('Fetching data from Google Drive...');
+      await sequelize.sync();
 
-    const parseCSV = (stream) => {
-      const { Readable } = require('stream');
-      const nodeStream = Readable.fromWeb(stream);
-      const results = [];
-
-      nodeStream
-        .pipe(csv({
-          mapHeaders: ({ header }) => header.toLowerCase().replace(/ /g, '_')
-        }))
-        .on('data', (data) => {
-          const processed = {
-            // Explicitly select only needed fields to save memory
-            customer_name: data.customer_name,
-            phone_number: data.phone_number,
-            customer_region: data.customer_region,
-            gender: data.gender,
-            product_category: data.product_category,
-            payment_method: data.payment_method,
-            date: data.date,
-
-            // Numeric fields
-            age: parseInt(data.age) || 0,
-            quantity: parseInt(data.quantity) || 0,
-            price_per_unit: parseFloat(data.price_per_unit) || 0,
-            discount_percentage: parseFloat(data.discount_percentage) || 0,
-            total_amount: parseFloat(data.total_amount) || 0,
-            final_amount: parseFloat(data.final_amount) || 0,
-
-            // Array fields - Store as string to save memory
-            tags: data.tags || ''
-          };
-          results.push(processed);
-        })
-        .on('end', () => {
-          this.data = results;
-          console.log(`Successfully loaded ${this.data.length} records from Google Drive.`);
-          this.resolveLoaded();
-        })
-        .on('error', (err) => {
-          console.error('Error parsing CSV stream:', err);
-          this.data = [];
-          this.resolveLoaded();
-        });
-    };
-
-    fetch(DRIVE_URL)
-      .then(async response => {
-        if (!response.ok) throw new Error(`Failed to fetch: ${response.statusText}`);
-
-        const contentType = response.headers.get('content-type');
-        if (contentType && contentType.includes('text/html')) {
-          console.log('Virus warning detected. Attempting to bypass...');
-          const text = await response.text();
-
-
-          const confirmMatch = text.match(/name="confirm" value="([^"]+)"/);
-          const uuidMatch = text.match(/name="uuid" value="([^"]+)"/);
-
-          if (confirmMatch && uuidMatch) {
-            const confirm = confirmMatch[1];
-            const uuid = uuidMatch[1];
-            const CONFIRM_URL = `https://drive.usercontent.google.com/download?id=${FILE_ID}&export=download&confirm=${confirm}&uuid=${uuid}`;
-
-            console.log('Fetching with confirmation...');
-            return fetch(CONFIRM_URL).then(res => {
-              if (!res.ok) throw new Error(`Failed to fetch confirmed URL: ${res.statusText}`);
-              return res.body;
-            });
-          } else {
-            throw new Error('Could not extract confirmation tokens from Drive page.');
-          }
-        }
-
-        return response.body;
-      })
-      .then(body => parseCSV(body))
-      .catch(err => {
-        console.error('Error loading data from Drive:', err.message);
-        console.log('Falling back to mock data.');
-        this.data = [];
+      const count = await Sale.count();
+      if (count === 0) {
+        console.log('Database is empty. Importing data from CSV...');
+        await this.importData();
+      } else {
+        console.log(`Database already contains ${count} records.`);
         this.resolveLoaded();
-      });
+      }
+    } catch (error) {
+      console.error('Database initialization error:', error);
+    }
   }
 
-  getSales(params) {
-    let results = this.data;
-
+  async getSales(params) {
+    const where = {};
 
     if (params.search) {
-      const searchLower = params.search.toLowerCase();
-      results = results.filter(item =>
-        (item.customer_name && item.customer_name.toLowerCase().includes(searchLower)) ||
-        (item.phone_number && item.phone_number.includes(searchLower))
-      );
+      const searchLower = `%${params.search.toLowerCase()}%`;
+      where[Op.or] = [
+        { customer_name: { [Op.like]: searchLower } },
+        { phone_number: { [Op.like]: searchLower } }
+      ];
     }
 
-
     if (params.region) {
-      const regions = Array.isArray(params.region) ? params.region : [params.region];
-      results = results.filter(item => regions.includes(item.customer_region));
+      where.customer_region = Array.isArray(params.region) ? { [Op.in]: params.region } : params.region;
     }
 
     if (params.gender) {
-      const genders = Array.isArray(params.gender) ? params.gender : [params.gender];
-      results = results.filter(item => genders.includes(item.gender));
+      where.gender = Array.isArray(params.gender) ? { [Op.in]: params.gender } : params.gender;
     }
 
     if (params.category) {
-      const categories = Array.isArray(params.category) ? params.category : [params.category];
-      results = results.filter(item => categories.includes(item.product_category));
+      where.product_category = Array.isArray(params.category) ? { [Op.in]: params.category } : params.category;
     }
 
     if (params.paymentMethod) {
-      const methods = Array.isArray(params.paymentMethod) ? params.paymentMethod : [params.paymentMethod];
-      results = results.filter(item => methods.includes(item.payment_method));
+      where.payment_method = Array.isArray(params.paymentMethod) ? { [Op.in]: params.paymentMethod } : params.paymentMethod;
     }
 
-    if (params.minAge) {
-      results = results.filter(item => item.age >= parseInt(params.minAge));
-    }
-    if (params.maxAge) {
-      results = results.filter(item => item.age <= parseInt(params.maxAge));
-    }
+    if (params.minAge) where.age = { ...where.age, [Op.gte]: parseInt(params.minAge) };
+    if (params.maxAge) where.age = { ...where.age, [Op.lte]: parseInt(params.maxAge) };
 
-    if (params.startDate) {
-      results = results.filter(item => new Date(item.date) >= new Date(params.startDate));
-    }
-    if (params.endDate) {
-      results = results.filter(item => new Date(item.date) <= new Date(params.endDate));
-    }
+    if (params.startDate) where.date = { ...where.date, [Op.gte]: params.startDate };
+    if (params.endDate) where.date = { ...where.date, [Op.lte]: params.endDate };
 
     if (params.tags) {
       const tags = Array.isArray(params.tags) ? params.tags : [params.tags];
-      results = results.filter(item => {
-        if (!item.tags) return false;
-        return tags.some(tag => item.tags.includes(tag));
-      });
+      where.tags = { [Op.or]: tags.map(tag => ({ [Op.like]: `%${tag}%` })) };
     }
 
-
-    // Critical: Only copy if we haven't filtered (to avoid mutating this.data)
-    if (results === this.data) {
-      results = [...results];
-    }
-
+    const order = [];
     if (params.sortBy) {
-      results.sort((a, b) => {
-        if (params.sortBy === 'date') {
-          return new Date(b.date) - new Date(a.date);
-        } else if (params.sortBy === 'quantity') {
-          return b.quantity - a.quantity;
-        } else if (params.sortBy === 'customer_name') {
-          return (a.customer_name || '').localeCompare(b.customer_name || '');
-        }
-        return 0;
-      });
+      if (params.sortBy === 'date') order.push(['date', 'DESC']);
+      else if (params.sortBy === 'quantity') order.push(['quantity', 'DESC']);
+      else if (params.sortBy === 'customer_name') order.push(['customer_name', 'ASC']);
     } else {
-
-      results.sort((a, b) => new Date(b.date) - new Date(a.date));
+      order.push(['date', 'DESC']);
     }
-
-
-    const stats = results.reduce((acc, item) => {
-      acc.totalUnits += item.quantity || 0;
-      acc.totalAmount += item.final_amount || 0;
-      const discount = (item.total_amount || 0) - (item.final_amount || 0);
-      acc.totalDiscount += discount;
-
-      acc.count += 1;
-      if ((item.final_amount || 0) > 0) acc.amountCount += 1;
-      if (discount > 0) acc.discountCount += 1;
-
-      return acc;
-    }, { totalUnits: 0, totalAmount: 0, totalDiscount: 0, count: 0, amountCount: 0, discountCount: 0 });
-
 
     const page = parseInt(params.page) || 1;
     const limit = parseInt(params.limit) || 10;
-    const startIndex = (page - 1) * limit;
-    const endIndex = page * limit;
+    const offset = (page - 1) * limit;
 
-    const paginatedResults = results.slice(startIndex, endIndex);
+    const { count, rows } = await Sale.findAndCountAll({
+      where,
+      order,
+      limit,
+      offset
+    });
+
+    // Calculate stats (simplified for performance, or do separate aggregate query)
+    // For large datasets, calculating stats on filtered result might be expensive.
+    // We'll do a separate aggregate query for stats on the filtered set.
+    const stats = await Sale.findAll({
+      attributes: [
+        [sequelize.fn('SUM', sequelize.col('quantity')), 'totalUnits'],
+        [sequelize.fn('SUM', sequelize.col('final_amount')), 'totalAmount'],
+        [sequelize.fn('COUNT', sequelize.col('transaction_id')), 'count'],
+        [sequelize.literal('SUM(total_amount - final_amount)'), 'totalDiscount'],
+        [sequelize.literal('SUM(CASE WHEN total_amount > final_amount THEN 1 ELSE 0 END)'), 'discountCount']
+      ],
+      where,
+      raw: true
+    });
+
+    // Calculate total discount manually or via another query if critical
+    // For now, let's use the basic stats
+    const statResult = stats[0] || {};
 
     return {
-      data: paginatedResults,
-      stats,
-      total: results.length,
+      data: rows,
+      stats: {
+        totalUnits: statResult.totalUnits || 0,
+        totalAmount: statResult.totalAmount || 0,
+        totalDiscount: statResult.totalDiscount || 0,
+        count: statResult.count || 0,
+        amountCount: statResult.count || 0,
+        discountCount: statResult.discountCount || 0
+      },
+      total: count,
       page,
       limit,
-      totalPages: Math.ceil(results.length / limit)
+      totalPages: Math.ceil(count / limit)
     };
   }
 
-  getUniqueValues(field) {
-    const values = new Set(this.data.map(item => item[field]).filter(Boolean));
-    return Array.from(values);
+  async getUniqueValues(field) {
+    const results = await Sale.findAll({
+      attributes: [[sequelize.fn('DISTINCT', sequelize.col(field)), field]],
+      raw: true
+    });
+    return results.map(item => item[field]).filter(Boolean);
   }
 
-  getAllTags() {
+  async getAllTags() {
+    // This is expensive in SQL if tags are comma-separated strings.
+    // Ideally tags should be normalized. For now, we'll fetch all tags and process in memory 
+    // (or use a distinct query if possible, but split is hard).
+    // Given the constraint, let's just return empty or a predefined list to avoid performance kill.
+    // Or, we can fetch distinct tags column and split.
+    const results = await Sale.findAll({
+      attributes: [[sequelize.fn('DISTINCT', sequelize.col('tags')), 'tags']],
+      raw: true
+    });
+
     const tags = new Set();
-    this.data.forEach(item => {
+    results.forEach(item => {
       if (item.tags) {
         item.tags.split(',').forEach(tag => tags.add(tag.trim()));
       }
