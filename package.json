@@ -1,0 +1,11 @@
+{
+  "name": "salesms-root",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "start": "echo 'Run scripts from backend or frontend workspaces'"
+  }
+}
