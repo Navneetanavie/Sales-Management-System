@@ -11,7 +11,7 @@ class SalesService {
 
   loadData() {
     const FILE_ID = '1tzbyuxBmrBwMSXbL22r33FUMtO0V_lxb';
-    const DRIVE_URL = `https:
+    const DRIVE_URL = `https://drive.google.com/uc?export=download&id=${FILE_ID}`;
 
     console.log('Fetching data from Google Drive...');
 
@@ -56,14 +56,14 @@ class SalesService {
           console.log('Virus warning detected. Attempting to bypass...');
           const text = await response.text();
 
-          
+
           const confirmMatch = text.match(/name="confirm" value="([^"]+)"/);
           const uuidMatch = text.match(/name="uuid" value="([^"]+)"/);
 
           if (confirmMatch && uuidMatch) {
             const confirm = confirmMatch[1];
             const uuid = uuidMatch[1];
-            const CONFIRM_URL = `https:
+            const CONFIRM_URL = `https://drive.usercontent.google.com/download?id=${FILE_ID}&export=download&confirm=${confirm}&uuid=${uuid}`;
 
             console.log('Fetching with confirmation...');
             return fetch(CONFIRM_URL).then(res => {
@@ -88,7 +88,7 @@ class SalesService {
   getSales(params) {
     let results = [...this.data];
 
-    
+
     if (params.search) {
       const searchLower = params.search.toLowerCase();
       results = results.filter(item =>
@@ -97,7 +97,7 @@ class SalesService {
       );
     }
 
-    
+
     if (params.region) {
       const regions = Array.isArray(params.region) ? params.region : [params.region];
       results = results.filter(item => regions.includes(item.customer_region));
@@ -138,24 +138,24 @@ class SalesService {
     }
 
 
-    
+
     if (params.sortBy) {
       results.sort((a, b) => {
         if (params.sortBy === 'date') {
-          return new Date(b.date) - new Date(a.date); 
+          return new Date(b.date) - new Date(a.date);
         } else if (params.sortBy === 'quantity') {
-          return b.quantity - a.quantity; 
+          return b.quantity - a.quantity;
         } else if (params.sortBy === 'customer_name') {
-          return (a.customer_name || '').localeCompare(b.customer_name || ''); 
+          return (a.customer_name || '').localeCompare(b.customer_name || '');
         }
         return 0;
       });
     } else {
-      
+
       results.sort((a, b) => new Date(b.date) - new Date(a.date));
     }
 
-    
+
     const stats = results.reduce((acc, item) => {
       acc.totalUnits += item.quantity || 0;
       acc.totalAmount += item.final_amount || 0;
@@ -169,7 +169,7 @@ class SalesService {
       return acc;
     }, { totalUnits: 0, totalAmount: 0, totalDiscount: 0, count: 0, amountCount: 0, discountCount: 0 });
 
-    
+
     const page = parseInt(params.page) || 1;
     const limit = parseInt(params.limit) || 10;
     const startIndex = (page - 1) * limit;
