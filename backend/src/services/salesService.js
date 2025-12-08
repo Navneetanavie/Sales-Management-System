@@ -14,7 +14,11 @@ class SalesService {
     this.dataLoaded = new Promise((resolve) => {
       this.resolveLoaded = resolve;
     });
+
+    this.filtersCache = null;
     this.initDatabase();
+
+
   }
 
   async ensureLoaded() {
@@ -28,14 +32,27 @@ class SalesService {
 
       await sequelize.sync();
 
+      await sequelize.query('PRAGMA journal_mode = WAL;');
+      await sequelize.query('PRAGMA synchronous = NORMAL;');
+      await sequelize.query('PRAGMA temp_store = MEMORY;');
+      await sequelize.query('PRAGMA cache_size = -100000;');
+
+      // Helpful indexes for common filters/sorts
+      await sequelize.query('CREATE INDEX IF NOT EXISTS idx_sales_date ON "Sales" (date DESC);');
+      await sequelize.query('CREATE INDEX IF NOT EXISTS idx_sales_search ON "Sales" (customer_name, phone_number);');
+      await sequelize.query('CREATE INDEX IF NOT EXISTS idx_sales_filters ON "Sales" (customer_region, gender, product_category);');
+
+
       const count = await Sale.count();
       if (count === 0) {
-        console.log('Database is empty. Importing data from CSV...');
-        await this.importData();
+        console.log('Database is empty. Importing data from CSV in background...');
+        this.importData();        // ✅ DO NOT await
+        this.resolveLoaded();    // ✅ API will work instantly
       } else {
         console.log(`Database already contains ${count} records.`);
         this.resolveLoaded();
       }
+
     } catch (error) {
       console.error('Database initialization error:', error);
     }
@@ -87,9 +104,17 @@ class SalesService {
           // Insert in batches
           for (let i = 0; i < results.length; i += BATCH_SIZE) {
             const batch = results.slice(i, i + BATCH_SIZE);
-            await Sale.bulkCreate(batch, { ignoreDuplicates: true });
+
+            await sequelize.transaction(async (t) => {
+              await Sale.bulkCreate(batch, {
+                ignoreDuplicates: true,
+                transaction: t
+              });
+            });
+
             if (i % 10000 === 0) console.log(`Inserted ${i} records...`);
           }
+
 
           console.log('Data imported successfully.');
           this.resolveLoaded();
@@ -108,92 +133,118 @@ class SalesService {
     const where = {};
 
     if (params.search) {
-      const searchLower = `%${params.search.toLowerCase()}%`;
+      const search = `%${params.search}%`;
       where[Op.or] = [
-        { customer_name: { [Op.like]: searchLower } },
-        { phone_number: { [Op.like]: searchLower } }
+        { customer_name: { [Op.like]: search } },
+        { phone_number: { [Op.like]: search } }
       ];
     }
 
-    if (params.region) {
-      where.customer_region = Array.isArray(params.region) ? { [Op.in]: params.region } : params.region;
+    if (params.region) where.customer_region = { [Op.in]: [].concat(params.region) };
+    if (params.gender) where.gender = { [Op.in]: [].concat(params.gender) };
+    if (params.category) where.product_category = { [Op.in]: [].concat(params.category) };
+    if (params.paymentMethod) where.payment_method = { [Op.in]: [].concat(params.paymentMethod) };
+
+    if (params.minAge || params.maxAge) {
+      where.age = {};
+      if (params.minAge) where.age[Op.gte] = +params.minAge;
+      if (params.maxAge) where.age[Op.lte] = +params.maxAge;
     }
 
-    if (params.gender) {
-      where.gender = Array.isArray(params.gender) ? { [Op.in]: params.gender } : params.gender;
+    if (params.startDate || params.endDate) {
+      where.date = {};
+      if (params.startDate) where.date[Op.gte] = params.startDate;
+      if (params.endDate) where.date[Op.lte] = params.endDate;
     }
 
-    if (params.category) {
-      where.product_category = Array.isArray(params.category) ? { [Op.in]: params.category } : params.category;
-    }
-
-    if (params.paymentMethod) {
-      where.payment_method = Array.isArray(params.paymentMethod) ? { [Op.in]: params.paymentMethod } : params.paymentMethod;
-    }
-
-    if (params.minAge) where.age = { ...where.age, [Op.gte]: parseInt(params.minAge) };
-    if (params.maxAge) where.age = { ...where.age, [Op.lte]: parseInt(params.maxAge) };
-
-    if (params.startDate) where.date = { ...where.date, [Op.gte]: params.startDate };
-    if (params.endDate) where.date = { ...where.date, [Op.lte]: params.endDate };
-
-    if (params.tags) {
-      const tags = Array.isArray(params.tags) ? params.tags : [params.tags];
-      where.tags = { [Op.or]: tags.map(tag => ({ [Op.like]: `%${tag}%` })) };
-    }
-
-    const order = [];
-    if (params.sortBy) {
-      if (params.sortBy === 'date') order.push(['date', 'DESC']);
-      else if (params.sortBy === 'quantity') order.push(['quantity', 'DESC']);
-      else if (params.sortBy === 'customer_name') order.push(['customer_name', 'ASC']);
-    } else {
-      order.push(['date', 'DESC']);
-    }
-
-    const page = parseInt(params.page) || 1;
-    const limit = parseInt(params.limit) || 10;
+    const page = +params.page || 1;
+    const limit = Math.min(+params.limit || 20, 100);
     const offset = (page - 1) * limit;
 
-    const { count, rows } = await Sale.findAndCountAll({
+
+    let order = [['date', 'DESC']];
+    if (params.sortBy === 'quantity') {
+      order = [['quantity', 'DESC']];
+    } else if (params.sortBy === 'customer_name') {
+      order = [['customer_name', 'ASC']];
+    }
+
+    const data = await Sale.findAll({
       where,
       order,
       limit,
-      offset
+      offset,
+      attributes: [
+        'transaction_id', 'customer_name', 'phone_number', 'product_category',
+        'final_amount', 'date',
+        'customer_id', 'employee_name', 'customer_region', 'gender',
+        'age', 'quantity', 'total_amount', 'product_id'
+      ] // ✅ send ALL data needed for table
     });
 
-
-    const stats = await Sale.findAll({
+    const stats = await Sale.findOne({
       attributes: [
+        [sequelize.fn('COUNT', sequelize.col('transaction_id')), 'count'],
         [sequelize.fn('SUM', sequelize.col('quantity')), 'totalUnits'],
         [sequelize.fn('SUM', sequelize.col('final_amount')), 'totalAmount'],
-        [sequelize.fn('COUNT', sequelize.col('transaction_id')), 'count'],
-        [sequelize.literal('SUM(total_amount - final_amount)'), 'totalDiscount'],
-        [sequelize.literal('SUM(CASE WHEN total_amount > final_amount THEN 1 ELSE 0 END)'), 'discountCount']
+        [sequelize.fn('SUM', sequelize.literal('total_amount - final_amount')), 'totalDiscount']
       ],
       where,
       raw: true
     });
 
-
-    const statResult = stats[0] || {};
+    const totalCount = Number(stats?.count || 0);
 
     return {
-      data: rows,
+      data,
       stats: {
-        totalUnits: statResult.totalUnits || 0,
-        totalAmount: statResult.totalAmount || 0,
-        totalDiscount: statResult.totalDiscount || 0,
-        count: statResult.count || 0,
-        amountCount: statResult.count || 0,
-        discountCount: statResult.discountCount || 0
+        totalUnits: Number(stats?.totalUnits || 0),
+        totalAmount: Number(stats?.totalAmount || 0),
+        totalDiscount: Number(stats?.totalDiscount || 0),
+        count: totalCount
       },
-      total: count,
+      total: totalCount,
       page,
       limit,
-      totalPages: Math.ceil(count / limit)
+      totalPages: Math.ceil(totalCount / limit)
     };
   }
+
+
+  async getFilterOptions() {
+    if (this.filtersCache) return this.filtersCache;
+
+    const [regions, genders, categories, paymentMethods] = await Promise.all([
+      Sale.findAll({
+        attributes: [[sequelize.fn('DISTINCT', sequelize.col('customer_region')), 'v']],
+        raw: true
+      }),
+      Sale.findAll({
+        attributes: [[sequelize.fn('DISTINCT', sequelize.col('gender')), 'v']],
+        raw: true
+      }),
+      Sale.findAll({
+        attributes: [[sequelize.fn('DISTINCT', sequelize.col('product_category')), 'v']],
+        raw: true
+      }),
+      Sale.findAll({
+        attributes: [[sequelize.fn('DISTINCT', sequelize.col('payment_method')), 'v']],
+        raw: true
+      })
+    ]);
+
+    const filters = {
+      regions: regions.map(x => x.v).filter(Boolean),
+      genders: genders.map(x => x.v).filter(Boolean),
+      categories: categories.map(x => x.v).filter(Boolean),
+      paymentMethods: paymentMethods.map(x => x.v).filter(Boolean),
+      tags: await this.getAllTags()
+    };
+
+    this.filtersCache = filters;
+    return filters;
+  }
+
 
   async getUniqueValues(field) {
     const results = await Sale.findAll({

@@ -1,14 +1,20 @@
 import React from 'react';
 
 const StatsCards = ({ stats }) => {
-  if (!stats) return null;
+  const safeStats = stats || {
+    totalUnits: 0,
+    totalAmount: 0,
+    totalDiscount: 0,
+    count: 0
+  };
 
   const formatCurrency = (value) => {
+    const safeValue = Number(value) || 0;
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
       currency: 'INR',
       maximumFractionDigits: 0
-    }).format(value);
+    }).format(safeValue);
   };
 
   const InfoIcon = () => (
@@ -26,24 +32,26 @@ const StatsCards = ({ stats }) => {
           <span className="stat-label">Total units sold</span>
           <InfoIcon />
         </div>
-        <div className="stat-value">{stats.totalUnits}</div>
+        <div className="stat-value">{safeStats.totalUnits}</div>
       </div>
+
       <div className="stat-card">
         <div className="stat-header">
           <span className="stat-label">Total Amount</span>
           <InfoIcon />
         </div>
         <div className="stat-value">
-          {formatCurrency(stats.totalAmount)} <span className="stat-value">(19 SRs)</span>
+          {formatCurrency(safeStats.totalAmount)} <span>(19 SRs)</span>
         </div>
       </div>
+
       <div className="stat-card">
         <div className="stat-header">
           <span className="stat-label">Total Discount</span>
           <InfoIcon />
         </div>
         <div className="stat-value">
-          {formatCurrency(stats.totalDiscount)} <span className="stat-value">(45 SRs)</span>
+          {formatCurrency(safeStats.totalDiscount)} <span className="stat-value">(45 SRs)</span>
         </div>
       </div>
     </div>

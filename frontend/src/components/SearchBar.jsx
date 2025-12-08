@@ -1,7 +1,8 @@
-import React from 'react';
+import React from "react";
+import { useState } from 'react';
 
 const SearchBar = ({ onSearch, initialValue = '' }) => {
-  const [term, setTerm] = React.useState(initialValue);
+  const [term, setTerm] = useState(initialValue);
 
   const handleChange = (e) => {
     setTerm(e.target.value);

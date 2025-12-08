@@ -1,4 +1,3 @@
-
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
 
 * {
@@ -167,9 +166,9 @@ body {
   display: flex;
   flex-direction: column;
   padding: 1rem 2rem;
-  
+
   gap: 0.8rem;
-  
+
   height: 100%;
   max-height: 100vh;
   overflow: hidden;
@@ -182,9 +181,9 @@ body {
   align-items: center;
   padding-bottom: 0.5rem;
   border-bottom: 1px solid #e0e0e0;
-  
+
   margin-bottom: 0.5rem;
-  
+
   margin-left: -2rem;
   margin-right: -2rem;
   padding-left: 2rem;
@@ -193,7 +192,7 @@ body {
 
 .page-title {
   font-size: 1rem;
-  
+
   font-weight: 600;
   margin: 0;
 }
@@ -235,11 +234,11 @@ body {
 .search-input {
   width: 100%;
   padding: 0.3rem 1rem 0.3rem 2.5rem;
-  
+
   border: 1px solid #e0e0e0;
   border-radius: 6px;
   font-size: 0.85rem;
-  
+
   background-color: #fff;
 }
 
@@ -248,7 +247,7 @@ body {
   display: flex;
   align-items: center;
   gap: 1rem;
-  
+
 }
 
 .refresh-btn {
@@ -318,8 +317,19 @@ body {
   padding: 0.5rem;
   min-width: 200px;
   z-index: 100;
-  max-height: 300px;
+  display: flex;
+  flex-direction: column;
+  max-height: 350px;
+}
+
+.dropdown-items-scroll {
   overflow-y: auto;
+  flex: 1;
+  /* Takes available space */
+  min-height: 0;
+  /* Important for firefox/flex scroll */
+  max-height: 250px;
+  /* Limit height of list */
 }
 
 .dropdown-item {
@@ -366,17 +376,17 @@ body {
 .stats-cards {
   display: flex;
   gap: 1rem;
-  
+
 }
 
 .stat-card {
   background: white;
   padding: 0.8rem 1rem;
-  
+
   border-radius: 8px;
   border: 1px solid #e0e0e0;
   min-width: 160px;
-  
+
 }
 
 .stat-header {
@@ -392,7 +402,7 @@ body {
 
 .stat-value {
   font-size: 1.1rem;
-  
+
   font-weight: 600;
   color: #222;
 }
@@ -410,9 +420,9 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  
+
   gap: 0.05rem;
-  
+
 }
 
 
@@ -421,17 +431,17 @@ body {
   border-radius: 8px;
   border: 1px solid #e0e0e0;
   overflow: auto;
-  
+
   flex-grow: 1;
-  
-  
+
+
 }
 
 .transaction-table {
   width: 100%;
   border-collapse: collapse;
   white-space: nowrap;
-  
+
 }
 
 .transaction-table th {
@@ -445,7 +455,7 @@ body {
   position: sticky;
   top: 0;
   z-index: 10;
-  
+
 }
 
 .transaction-table td {
@@ -531,4 +541,23 @@ body {
   text-align: center;
   padding: 2rem;
   color: #666;
+}
+
+.apply-btn {
+  margin-top: 0.5rem;
+  padding: 0.3rem 0.8rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: white;
+  background-color: #3b82f6;
+  /* Blue-500 */
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.apply-btn:hover {
+  background-color: #1d4ed8;
+  /* Blue-700 */
 }

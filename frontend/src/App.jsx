@@ -12,7 +12,6 @@ import Sidebar from './components/Sidebar';
 
 function App() {
   const [salesData, setSalesData] = useState([]);
-  const [stats, setStats] = useState(null);
   const [filterOptions, setFilterOptions] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -23,6 +22,12 @@ function App() {
   const [sortBy, setSortBy] = useState('date');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+
+  const [stats, setStats] = useState({
+    totalUnits: 0,
+    totalAmount: 0,
+    count: 0
+  });
 
   useEffect(() => {
     loadFilters();
@@ -60,12 +65,13 @@ function App() {
       });
 
       const data = await fetchSales(params);
-      setSalesData(data.data);
-      setStats(data.stats);
-      setTotalPages(data.totalPages);
+      setSalesData(data.data || []);
+      setStats(data.stats || {});
+      setTotalPages(data.totalPages || 1);
       setError(null);
     } catch (err) {
-      setError(err.message);
+      console.error("API Error:", err);
+      setError("Failed to load sales data");
     } finally {
       setLoading(false);
     }
@@ -124,7 +130,7 @@ function App() {
           <SortControl sortBy={sortBy} onSortChange={handleSortChange} />
         </div>
 
-        <StatsCards stats={stats} />
+        {stats && <StatsCards stats={stats} />}
 
         <div className="content-area">
           {loading ? (

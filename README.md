@@ -25,7 +25,7 @@ Sorting is achieved via the `order` parameter in Sequelize queries. The API acce
 ## Pagination Implementation Summary
 Server-side pagination is implemented using `limit` and `offset` in Sequelize. The frontend sends `page` and `limit` parameters. The backend calculates `offset = (page - 1) * limit` and returns the requested slice of data along with total count and total pages metadata.
 
-## Setup Instructions
+## Local Setup Instructions
 1.  **Backend Setup**:
     ```bash
     cd backend
