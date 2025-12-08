@@ -325,11 +325,11 @@ body {
 .dropdown-items-scroll {
   overflow-y: auto;
   flex: 1;
-  /* Takes available space */
+  
   min-height: 0;
-  /* Important for firefox/flex scroll */
+  
   max-height: 250px;
-  /* Limit height of list */
+  
 }
 
 .dropdown-item {
@@ -550,7 +550,7 @@ body {
   font-weight: 500;
   color: white;
   background-color: #3b82f6;
-  /* Blue-500 */
+  
   border: none;
   border-radius: 4px;
   cursor: pointer;
@@ -559,5 +559,5 @@ body {
 
 .apply-btn:hover {
   background-color: #1d4ed8;
-  /* Blue-700 */
+  
 }

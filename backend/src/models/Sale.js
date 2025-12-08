@@ -22,7 +22,7 @@ const Sale = sequelize.define('Sale', {
   discount_percentage: DataTypes.FLOAT,
   total_amount: DataTypes.FLOAT,
   final_amount: DataTypes.FLOAT,
-  tags: DataTypes.TEXT // Stored as comma-separated string
+  tags: DataTypes.TEXT 
 }, {
   indexes: [
     { fields: ['customer_region'] },

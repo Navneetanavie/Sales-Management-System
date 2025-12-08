@@ -23,7 +23,7 @@ const FilterBar = ({ filters, options, onFilterChange }) => {
   const [activeDropdown, setActiveDropdown] = useState(null);
   const [tempFilters, setTempFilters] = useState(filters);
 
-  // Sync tempFilters when prop filters change (e.g. after Apply)
+  
   useEffect(() => {
     setTempFilters(filters);
   }, [filters]);
